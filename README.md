@@ -2,12 +2,7 @@
 
 ## Выполнение лабы:
 
-### Задание 1.
-Запуск скрипта push_all.sh, результат в pushed.png
-
-### Задание 2.
 Запуск приложения:
 ```
-sudo docker-compose up -d --build
+kubectl apply -f k8s-app.yaml
 ```
-Результат в docker.png и working.png
