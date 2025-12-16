@@ -2,12 +2,11 @@ pipeline {
     agent any
 
     parameters {
-        string(name: 'VERSION', defaultValue: '1.0.1', description: 'Version to deploy')
+        string(name: 'VERSION', defaultValue: '1.0.9', description: 'Version to deploy')
     }
 
     environment {
-        NEXUS_URL = "http://nexus:8081/repository/maven-releases"
-        NEXUS_GROUP = "com/example"
+        NEXUS_CRED_ID = 'nexus-credentials'
     }
 
     stages {
@@ -16,12 +15,24 @@ pipeline {
                 cleanWs()
             }
         }
+        
+        stage('Prepare Source Code') {
+            steps {
+                script {
+                    echo "Copying ansible code from mounted volume..."
+                    sh 'cp -r /workspace/project/lab3-ansible .'
+                }
+            }
+        }
 
         stage('Download Artifacts') {
             steps {
-                script {
-                    sh "curl -u admin:admin123 -O ${NEXUS_URL}/${NEXUS_GROUP}/frontend/${params.VERSION}/frontend-${params.VERSION}.tar.gz"
-                    sh "curl -u admin:admin123 -O ${NEXUS_URL}/${NEXUS_GROUP}/backend/${params.VERSION}/backend-${params.VERSION}.tar.gz"
+                withCredentials([usernamePassword(credentialsId: NEXUS_CRED_ID, usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                    script {
+                        echo "Downloading artifacts version ${params.VERSION}..."
+                        sh "curl -f -u ${NEXUS_USER}:${NEXUS_PASS} -O http://nexus:8081/repository/maven-releases/com/example/frontend/${params.VERSION}/frontend-${params.VERSION}.tar.gz"
+                        sh "curl -f -u ${NEXUS_USER}:${NEXUS_PASS} -O http://nexus:8081/repository/maven-releases/com/example/backend/${params.VERSION}/backend-${params.VERSION}.tar.gz"
+                    }
                 }
             }
         }
@@ -36,12 +47,11 @@ pipeline {
         stage('Run Ansible Playbook') {
             steps {
                 dir('lab3-ansible') {
-                    
                     ansiblePlaybook(
                         playbook: 'deploy-from-artifacts.yml', 
                         inventory: 'inventory.ini', 
-                        credentialsId: 'ssh-credentials',
-                        extras: '-e "frontend_src=../deploy/frontend/dist backend_src=../deploy/backend/backend-app"'
+                        credentialsId: 'ssh-credentials', 
+                        extras: '-e "frontend_src=../deploy/frontend/dist/ backend_src=../deploy/backend/backend-app"'
                     )
                 }
             }
