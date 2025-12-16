@@ -69,6 +69,13 @@
     GOPATH: /root/go
     PATH: "/usr/local/go/bin:/root/go/bin:{{ ansible_env.PATH }}"
 
+- name: Wait for Postgres to be ready
+  wait_for:
+    host: postgres
+    port: 5432
+    delay: 2
+    timeout: 30
+
 - name: Stop existing application (if running)
   shell: |
     pkill -f "run.sh" || true
