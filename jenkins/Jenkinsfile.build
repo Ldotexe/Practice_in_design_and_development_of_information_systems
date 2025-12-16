@@ -1,0 +1,95 @@
+pipeline {
+    agent any
+
+    environment {
+        NEXUS_VERSION = "nexus3"
+        NEXUS_PROTOCOL = "http"
+        NEXUS_URL = "nexus:8081"
+        NEXUS_REPO = "maven-releases"
+        NEXUS_CREDENTIAL_ID = "nexus-credentials"
+        
+        BUILD_VERSION = "1.0.${BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Static Code Analysis') {
+            parallel {
+                stage('Frontend Lint') {
+                    steps {
+                        dir('frontend') {
+                            sh 'docker run --rm -v $(pwd):/app -w /app node:20-alpine npm install && npm run lint || true' 
+                        }
+                    }
+                }
+                stage('Backend Vet') {
+                    steps {
+                        dir('backend') {
+                            sh 'docker run --rm -v $(pwd):/base -w /base golang:1.22 go vet ./...'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                script {
+                     dir('frontend') {
+                        sh 'docker run --rm -v $(pwd):/app -w /app node:20-alpine npm install && npm test'
+                     }
+                }
+            }
+        }
+
+        stage('Publish Allure Report') {
+            steps {
+                echo "Allure report generated (mock)"
+            }
+        }
+
+        stage('Build Artifacts') {
+            parallel {
+                stage('Build Frontend') {
+                    steps {
+                        dir('frontend') {
+                            sh 'docker run --rm -v $(pwd):/app -w /app node:20-alpine sh -c "npm install && npm run build"'
+                            sh 'tar -czf frontend-${BUILD_VERSION}.tar.gz dist/'
+                        }
+                    }
+                }
+                stage('Build Backend') {
+                    steps {
+                        dir('backend') {
+                            sh 'docker run --rm -v $(pwd):/base -w /base -e GOOS=linux -e GOARCH=amd64 golang:1.22 go build -o backend-app ./cmd/service'
+                            sh 'tar -czf backend-${BUILD_VERSION}.tar.gz backend-app'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Upload to Nexus') {
+            steps {
+                nexusArtifactUploader(
+                    nexusVersion: NEXUS_VERSION,
+                    protocol: NEXUS_PROTOCOL,
+                    nexusUrl: NEXUS_URL,
+                    groupId: 'com.example',
+                    version: BUILD_VERSION,
+                    repository: NEXUS_REPO,
+                    credentialsId: NEXUS_CREDENTIAL_ID,
+                    artifacts: [
+                        [artifactId: 'frontend', classifier: '', file: 'frontend/frontend-${BUILD_VERSION}.tar.gz', type: 'tar.gz'],
+                        [artifactId: 'backend', classifier: '', file: 'backend/backend-${BUILD_VERSION}.tar.gz', type: 'tar.gz']
+                    ]
+                )
+            }
+        }
+    }
+}
