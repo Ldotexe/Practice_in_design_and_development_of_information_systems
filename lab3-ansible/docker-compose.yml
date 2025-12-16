@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # 1. Управляющий узел (отсюда запускаем плейбуки)
+  ansible-control:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.control
+    container_name: ansible-master
+    volumes:
+      - ./:/ansible            # Монтируем папку с плейбуками
+      - ../backend:/src/backend   # Монтируем исходники бэкенда
+      - ../frontend:/src/frontend # Монтируем исходники фронтенда
+      - /var/run/docker.sock:/var/run/docker.sock # <--- КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ
+    networks:
+      - ansiblenet
+
+  # 2. Целевой сервер для Nginx
+  target-nginx:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.target
+    container_name: target-nginx
+    hostname: target-nginx
+    ports:
+      - "8081:80" # Пробрасываем порт наружу для проверки
+    networks:
+      - ansiblenet
+
+  # 3. Целевой сервер для Приложения
+  target-app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.target
+    container_name: target-app
+    hostname: target-app
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password123
+      - POSTGRES_DB=messenger
+      - POSTGRES_PW=password123 # Для run.sh
+    networks:
+      - ansiblenet
+
+  # 4. База данных (Вспомогательный контейнер)
+  postgres:
+    image: postgres:14-alpine
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password123
+      - POSTGRES_DB=messenger
+    networks:
+      - ansiblenet
+
+networks:
+  ansiblenet:
+    driver: bridge

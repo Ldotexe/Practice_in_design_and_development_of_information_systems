@@ -1,0 +1,40 @@
+---
+- name: Build Frontend using Docker Container
+  hosts: localhost # Запускаем только на управляющем узле
+  connection: local
+  vars:
+    BUILD_OUTPUT_DIR: "./frontend_build"
+    SOURCE_DIR: "../frontend"
+    CONTAINER_BUILD_DIR: "/app"
+    
+  tasks:
+    - name: Clean up previous build directory
+      file:
+        path: "{{ BUILD_OUTPUT_DIR }}"
+        state: absent
+
+    - name: Create build directory
+      file:
+        path: "{{ BUILD_OUTPUT_DIR }}"
+        state: directory
+
+    - name: Run build inside temporary Node container
+      community.docker.docker_container:
+        name: frontend_builder_temp
+        image: node:20-alpine
+        # ИЗМЕНЕНИЕ: Сначала устанавливаем зависимости, потом собираем
+        command: sh -c "npm install && npm run build"
+        volumes:
+          # 1. Монтируем исходники фронтенда, чтобы сборщик мог писать (нет :ro)
+          - "{{ SOURCE_DIR }}:{{ CONTAINER_BUILD_DIR }}"
+          # 2. Монтируем конечную папку сборки (/ansible/frontend_build) 
+          #    в ту папку, куда собирает Vite (обычно /app/dist).
+          #    ПРИМЕЧАНИЕ: Это маппирование должно быть обратным!
+          - "{{ BUILD_OUTPUT_DIR }}:{{ CONTAINER_BUILD_DIR }}/dist"
+        working_dir: "{{ CONTAINER_BUILD_DIR }}" # /app
+        auto_remove: yes 
+        state: started
+        
+    - name: Debug Frontend build completed
+      debug:
+        msg: "Frontend build files are now available in {{ BUILD_OUTPUT_DIR }}/dist"

@@ -2,7 +2,7 @@
 
 ## Выполнение лабы:
 
-Запуск приложения:
-```
-kubectl apply -f k8s-app.yaml
-```
+docker-compose up -d --build
+
+docker exec -it ansible-master bash
+ansible-playbook -i inventory.ini deploy.yml

@@ -1,0 +1,13 @@
+- name: Build Frontend Application (Local)
+  import_playbook: build_frontend.yml # <-- Сначала собираем
+
+- name: Configure Nginx and Deploy Frontend
+  hosts: loadbalancers
+  roles:
+    - frontend # <-- Деплоим (просто копируем статику)
+    - nginx 
+
+- name: Deploy Backend Application
+  hosts: appservers
+  roles:
+    - backend

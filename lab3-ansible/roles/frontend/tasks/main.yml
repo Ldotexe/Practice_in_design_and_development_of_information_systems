@@ -1,0 +1,23 @@
+---
+# ЭТА РОЛЬ ТОЛЬКО КОПИРУЕТ УЖЕ СОБРАННЫЕ ФАЙЛЫ
+- name: Create web root directory
+  ansible.builtin.file:
+    path: /var/www/messenger
+    state: directory
+    mode: '0755'
+    
+- name: Deploy built files to Nginx web root
+  ansible.builtin.copy:
+    # ИСПРАВЛЕНИЕ: Используем {{ playbook_dir }} для гарантии абсолютного пути
+    # {{ playbook_dir }} = /ansible
+    src: "{{ playbook_dir }}/frontend_build/dist/"
+    dest: /var/www/messenger/
+    owner: root
+    group: root
+    mode: '0755'
+    
+- name: Clean up temporary build directory on Master
+  ansible.builtin.file:
+    path: "{{ playbook_dir }}/frontend_build"
+    state: absent
+  delegate_to: localhost # Эта задача выполняется на Ansible-мастере
