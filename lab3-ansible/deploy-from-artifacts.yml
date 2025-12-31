@@ -1,0 +1,24 @@
+---
+- name: Deploy Frontend
+  hosts: loadbalancers
+  vars:
+    frontend_src: "../deploy/frontend/dist/" 
+  tasks:
+    - name: Copy frontend files
+      copy:
+        src: "{{ frontend_src }}"
+        dest: /var/www/messenger/
+        mode: '0755'
+
+- name: Deploy Backend
+  hosts: appservers
+  vars:
+    backend_src: "../deploy/backend/backend-app"
+  tasks:
+    - name: Copy backend binary
+      copy:
+        src: "{{ backend_src }}"
+        dest: /app/backend-app
+        mode: '0755'
+    - name: Restart Service
+      shell: "nohup /app/backend-app > /app/app.log 2>&1 &"
