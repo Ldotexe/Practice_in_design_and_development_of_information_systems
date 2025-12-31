@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  ansible-control:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.control
+    container_name: ansible-master
+    volumes:
+      - ./:/ansible         
+      - ../backend:/src/backend   
+      - ../frontend:/src/frontend 
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - ansiblenet
+
+
+  target-nginx:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.target
+    container_name: target-nginx
+    hostname: target-nginx
+    ports:
+      - "8081:80"
+    networks:
+      - ansiblenet
+
+  target-app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.target
+    container_name: target-app
+    hostname: target-app
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password123
+      - POSTGRES_DB=messenger
+      - POSTGRES_PW=password123
+    networks:
+      - ansiblenet
+
+  postgres:
+    image: postgres:14-alpine
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password123
+      - POSTGRES_DB=messenger
+    networks:
+      - ansiblenet
+
+networks:
+  ansiblenet:
+    driver: bridge

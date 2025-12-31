@@ -1,0 +1,33 @@
+---
+- name: Build Frontend locally on Master
+  hosts: localhost
+  connection: local
+  vars:
+    SOURCE_DIR: "/src/frontend" 
+    BUILD_OUTPUT_DIR: "{{ playbook_dir }}/frontend_build"
+
+  tasks:
+    - name: Install dependencies
+      command: npm install
+      args:
+        chdir: "{{ SOURCE_DIR }}"
+
+    - name: Run Build
+      command: npm run build
+      args:
+        chdir: "{{ SOURCE_DIR }}"
+
+    - name: Clean up previous build directory in ansible folder
+      file:
+        path: "{{ BUILD_OUTPUT_DIR }}"
+        state: absent
+
+    - name: Create destination directory
+      file:
+        path: "{{ BUILD_OUTPUT_DIR }}"
+        state: directory
+
+    - name: Copy build artifacts to playbook dir (for copy module later)
+      copy:
+        src: "{{ SOURCE_DIR }}/dist/"
+        dest: "{{ BUILD_OUTPUT_DIR }}/dist/"

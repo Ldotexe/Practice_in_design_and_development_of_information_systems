@@ -1,0 +1,108 @@
+---
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install system dependencies
+  apt:
+    name:
+      - git
+      - make
+      - curl
+      - tar
+    state: present
+
+- name: Remove old Go installation
+  file:
+    path: /usr/local/go
+    state: absent
+
+- name: Download Go 1.22 binary
+  get_url:
+    url: https://go.dev/dl/go1.22.5.linux-amd64.tar.gz
+    dest: /tmp/go.tar.gz
+
+- name: Extract Go to /usr/local
+  unarchive:
+    src: /tmp/go.tar.gz
+    dest: /usr/local
+    remote_src: yes
+
+- name: Create symlink for Go executable
+  file:
+    src: /usr/local/go/bin/go
+    dest: /usr/bin/go
+    state: link
+
+
+- name: Create app directory
+  file:
+    path: /app
+    state: directory
+    mode: '0755'
+
+- name: Copy backend source code
+  copy:
+    src: /src/backend/
+    dest: /app/
+    mode: '0755'
+
+- name: Make run.sh executable
+  file:
+    path: /app/run.sh
+    mode: '0755'
+
+- name: Fix paths in run.sh (Replace /base with /app)
+  replace:
+    path: /app/run.sh
+    regexp: '/base'
+    replace: '/app'
+
+- name: Install Go dependencies
+  shell: go mod download
+  args:
+    chdir: /app
+
+- name: Build Goose (Migration tool)
+  shell: go install github.com/pressly/goose/v3/cmd/goose@latest
+  environment:
+    GOPATH: /root/go
+    PATH: "/usr/local/go/bin:/root/go/bin:{{ ansible_env.PATH }}"
+
+- name: Wait for Postgres to be ready
+  wait_for:
+    host: postgres
+    port: 5432
+    delay: 2
+    timeout: 30
+
+- name: Stop existing application (if running)
+  shell: |
+    pkill -f "run.sh" || true
+    pkill -f "cmd/service" || true
+    pkill -f "go run" || true
+  ignore_errors: yes
+
+- name: Start Application via run.sh
+  shell: |
+    # Добавляем Go в PATH принудительно для этого shell
+    export PATH=$PATH:/usr/local/go/bin:/root/go/bin
+    nohup ./run.sh > app.log 2>&1 &
+  args:
+    chdir: /app
+  async: 10
+  poll: 0
+  environment:
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: 5432
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: password123
+    POSTGRES_DB: messenger
+    POSTGRES_PW: password123
+    DB_HOST: postgres
+    DB_PORT: 5432
+    DB_USER: postgres
+    DB_PASSWORD: password123
+    DB_NAME: messenger
+    PORT: "8000"
+    APP_PORT: "8000"

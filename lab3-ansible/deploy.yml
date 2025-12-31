@@ -1,0 +1,13 @@
+- name: Build Frontend Application (Local)
+  import_playbook: build_frontend.yml
+
+- name: Configure Nginx and Deploy Frontend
+  hosts: loadbalancers
+  roles:
+    - frontend
+    - nginx 
+
+- name: Deploy Backend Application
+  hosts: appservers
+  roles:
+    - backend
